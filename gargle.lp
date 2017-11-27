@@ -1,42 +1,48 @@
 #const sx = 5.
-#const sy = 14.
+#const sy = 6.
 #const sz = 5.
 #const stairs_per_floor = 1.
 % define?
 cell(1..sx, 1..sy, 1..sz).
-
-% a tile on the top floor must connect to this tile 
-must_connect_to((sx/2, 1, sz/2)).
 
 % tiles, format: 
 % pdef((tile name, 0), back edge, right edge, forward edge, left edge, bottom edge, top edge)
 
 pdef((google_office_floor, 0),          path, path, path, path, normal, normal).
 
-pdef((google_office_corner, 0),         path, wall, wall, path, normal, normal).
+pdef((google_office_corner, 0),         path, path, wall, wall, normal, normal).
+
+pdef((google_office_corner_plain, 0),   path, path, wall, wall, normal, normal).
 
 pdef((google_office_info_desk, 0),      path, path, path, path, normal, normal).
 
 pdef((google_office_kitchen, 0),        path, path, wall, path, normal, normal).
 
-pdef((google_office_kitchen_couch, 0),  corridor, path, path, path, normal, normal).
+pdef((google_office_kitchen_couch, 0),  path, path, corridor, path, normal, normal).
 
 pdef((google_office_pillar, 0),         path, path, path, path, normal, normal).
 
-pdef((google_office_pillar, 0),         wall, wall, wall, wall, normal, normal).
-
 pdef((google_office_pillar_alt, 0),     path, path, path, path, normal, normal).
 
-% full staircase is a multi-tile (spans a 1x2x1 block) so empty must be placed above it 
+pdef((air, 0),                          wall, wall, wall, wall, normal, normal).
+
+% assign(3, 1..sy, 3, (air, 0)).
+
+% sane basement
+% assign(0..sx, 0, 0..sz, (google_office_floor, 0)).
+
+% full staircase is a multi-tile (spans a 1x2x1 block) so an empty dummy tile must be placed above it 
 % it has to be a multitle bc if it wasn't the top part of the staircase might have been
 % a different rotation to the bottom part and so be untraversable
 
 pdef((google_spiral_staircase_full, 0), path, path, path, path, normal, stair).
-pdef((empty, 0), path, path, path, path, stair, normal).
+pdef((empty, 0),                        path, path, path, path, stair, normal).
 
-pdef((google_office_corridor, 0), corridor, wall, corridor, wall, normal, normal).
+pdef((google_office_corridor, 0),       corridor, wall, corridor, wall, normal, normal).
 
-pdef((google_office_wall_door, 0), corridor, path, path, path, normal, normal).
+pdef((google_office_wall_door, 0),      path, path, corridor, path, normal, normal).
+
+pdef((google_office_wall_door, 0),      path, path, path, path, normal, normal).
 
 % generate rotations of the tile
 pdef((P, I), E4, E1, E2, E3, U, D) :- pdef((P, I - 1), E1, E2, E3, E4, U, D), I <= 4, I >= 0.
@@ -139,7 +145,8 @@ walkable(0, -1, 0, P1, P2) :-
 edge((X1, Y1, Z1), (X2, Y2, Z2)) :- 
   assign(X1, Y1, Z1, P1), 
   assign(X2, Y2, Z2, P2),
-  walkable(X1 - X2, Y1 - Y2, Z1 - Z2, P1, P2).
+  adj(X1, Y1, Z1, X2, Y2, Z2, DX, DY, DZ),
+  walkable(DX, DY, DZ, P1, P2).
 
 connected(X,Z) :- edge(X,Z).
 
@@ -159,19 +166,33 @@ adj(X1, Y1, Z1, X2, Y2, Z2, DX, DY, DZ) :-
 :- adj(X1,Y1,Z1,X2,Y2,Z2,DX,DY,DZ), assign(X1,Y1,Z1,P1),
   not 1 { assign(X2,Y2,Z2,P2):legal(DX,DY,DZ,P1,P2) }.
   
-% every important pattern must be present at least 1 times
+% at least 1 rotation of every pattern must be present at least 1 times
 :- pattern((P, _)), not 1 { assign(X,Y,Z,(P, _)):cell(X,Y,Z) }.
+
+% don't put staircases next to each other
+%:- assign(X1,Y1,Z1, (google_spiral_staircase_full, _)),
+%   assign(X2,Y2,Z2, (google_spiral_staircase_full, _)),
+%   adj(X1,Y1,Z1,X2,Y2,Z2,DX,DY,DZ).
+
 
 floor(1..sy).
 
-% any floor can have 1 to k staircases
+% any floor can have 1 to k staircases doesnt work...
 %:- floor(I), not 1 <= #count { assign(X,Y,Z,(google_spiral_staircase_full, 0..3)):cell(X,Y,Z) } 
-%                      <= stairs_per_floor.
+%                    <= stairs_per_floor.
 
-:- not connected((sx/2, 1, sz/2), (sx/2,sy,sz/2)).
+% the corners of every floor must be connected
+
+%:- not connected((2, 1, 2), (2, sy, 2)).
+%:- not connected((1, 1, 1), (2, 1, 2)).
+
+hot(X) :- connected(X, (1,1,1)).
+
+:- not hot((1..2, sy, 1..2)).
 
 % there must be a cell on storey 1 connected to a cell on the top storey
 % :- not 1 <= #count { must_connect_to((X, sy, z)):cell(X,sy,Z) }.
-
+#show edge/2.
+#show hot/1.
 #show assign/4.
 %#show edge/2.
